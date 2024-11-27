@@ -1,8 +1,11 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using HotelListing.API.Data.Configurations;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 
 namespace HotelListing.API.Data
 {
-    public class HotelDbContext : DbContext
+    public class HotelDbContext : IdentityDbContext<User>
     {
         public HotelDbContext(DbContextOptions options) : base(options)
         {
@@ -60,6 +63,19 @@ namespace HotelListing.API.Data
                     CountryId = 2
                 }
                 );
+
+            modelBuilder.Entity<IdentityRole>().HasData(
+                new IdentityRole
+                {
+                    Name = "Administrator",
+                    NormalizedName = "ADMINISTRATOR"
+                },
+                new IdentityRole
+                {
+                    Name = "User",
+                    NormalizedName = "USER"
+                }
+             );
         }
     }
 }
