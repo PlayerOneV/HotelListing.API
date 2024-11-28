@@ -36,21 +36,28 @@ namespace HotelListing.API.Controllers
             return Ok();
         }
         
-        // api/Authentication/register
+        // api/Authentication/login
         [HttpPost]
         [Route("login")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<ActionResult> Login([FromBody] LoginDto loginDto) {
+            
             var loginResult = await _authManager.Login(loginDto);
-            return loginResult switch
+            
+            switch (loginResult.LoginResponse)
             {
-                UserLoginResult.Success => Ok(),
-                UserLoginResult.UserNotFound => NotFound(new { message = "User not found" }),
-                UserLoginResult.InvalidPassword => Unauthorized(new { message = "Invalid password" }),
-                _ => StatusCode(500, new { message = "Unexpected error occurred" })
-            };
+                case UserLoginResponse.Success:
+                    var token = _authManager.GenerateJwtToken(loginResult.LoggedUser);
+                    return Ok(new {token });
+                case UserLoginResponse.UserNotFound:
+                    return NotFound();
+                case UserLoginResponse.InvalidPassword:
+                    return Unauthorized();
+                default:
+                    return StatusCode(StatusCodes.Status500InternalServerError);
+            }
         }
     }
 }

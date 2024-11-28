@@ -1,6 +1,6 @@
 ﻿namespace HotelListing.API.Enums
 {
-    public enum UserLoginResult
+    public enum UserLoginResponse
     {
         Success,
         UserNotFound,
