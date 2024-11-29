@@ -20,7 +20,9 @@ builder.Services.AddDbContext<HotelDbContext>(options =>
 
 builder.Services.AddIdentityCore<User>()
     .AddRoles<IdentityRole>()
+    .AddTokenProvider<DataProtectorTokenProvider<User>>(builder.Configuration["JwtSettings:Issuer"]!)
     .AddEntityFrameworkStores<HotelDbContext>();
+
 builder.Services.AddControllers();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
@@ -58,6 +60,7 @@ builder.Services.AddAuthentication(options =>
         ValidAudience = builder.Configuration["JwtSettings:Audience"],
         IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["JwtSettings:Key"]))
     };
+    options.IncludeErrorDetails = true;
 });
 
 var app = builder.Build();
@@ -72,9 +75,8 @@ if (app.Environment.IsDevelopment())
 app.UseSerilogRequestLogging();
 
 app.UseHttpsRedirection();
-
-app.UseCors(); 
-
+app.UseCors("AllowAll"); 
+app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();

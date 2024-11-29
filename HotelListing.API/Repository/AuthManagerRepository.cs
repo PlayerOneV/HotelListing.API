@@ -16,6 +16,8 @@ namespace HotelListing.API.Repository
         private readonly IMapper _mapper;
         private readonly UserManager<User> _userManager;
         private readonly IConfiguration _configuration;
+        private const string _loginProvider = "HotelListingAPI";
+        private const string _refreshToken = "RefreshToken";
 
         public AuthManagerRepository(IMapper mapper, UserManager<User> userManager, IConfiguration configuration)
         {
@@ -43,7 +45,7 @@ namespace HotelListing.API.Repository
             }.Union(userClaims).Union(roleClaims);
 
             var token = new JwtSecurityToken(
-                issuer: _configuration["JwtSettings:Key"],
+                issuer: _configuration["JwtSettings:Issuer"],
                 audience: _configuration["JwtSettings:Audience"],
                 claims: claims,
                 expires: DateTime.Now.AddMinutes(Convert.ToInt32(_configuration["JwtSettings:DurationInMinutes"])),
@@ -53,7 +55,7 @@ namespace HotelListing.API.Repository
             return new JwtSecurityTokenHandler().WriteToken(token);
         }
 
-        public async Task<LoginResultDto> Login(LoginDto loginDto)
+        public async Task<LoggingAttentResultDto> Login(LoginDto loginDto)
         {
           
             var user = await _userManager.FindByEmailAsync(loginDto.Email);
@@ -76,11 +78,13 @@ namespace HotelListing.API.Repository
             return result.Errors;
         }
 
-        private async Task<LoginResultDto> ValidateLoginResponse(User user, string password)
+
+
+        private async Task<LoggingAttentResultDto> ValidateLoginResponse(User user, string password)
         {
             if (user is null)
             {
-                return new LoginResultDto
+                return new LoggingAttentResultDto
                 {
                     LoginResponse = UserLoginResponse.UserNotFound,
                     LoggedUser = null
@@ -90,14 +94,49 @@ namespace HotelListing.API.Repository
             var isValidPassword = await _userManager.CheckPasswordAsync(user, password);
             if (!isValidPassword)
             {
-                return new LoginResultDto
+                return new LoggingAttentResultDto
                 {
                     LoginResponse = UserLoginResponse.InvalidPassword,
                     LoggedUser = null
                 };
             }
 
-            return new LoginResultDto { LoginResponse = UserLoginResponse.Success, LoggedUser = user };
+            return new LoggingAttentResultDto { LoginResponse = UserLoginResponse.Success, LoggedUser = user };
+        }
+
+        public async Task<string> CreateRefreshToken(User user)
+        {
+            await _userManager.RemoveAuthenticationTokenAsync(user, _loginProvider, _refreshToken);
+            var newRefreshToken = await _userManager.GenerateUserTokenAsync(user, _loginProvider, _refreshToken);
+            await _userManager.SetAuthenticationTokenAsync(user, _loginProvider, _refreshToken, newRefreshToken);
+
+            return newRefreshToken;
+        }
+
+        public async Task<SuccessfullAuthenticationDto?> VerifyRefreshToken(SuccessfullAuthenticationDto refreshRequest)
+        {
+            var jwtSecurityTokenHandler = new JwtSecurityTokenHandler();
+            var tokenContent = jwtSecurityTokenHandler.ReadJwtToken(refreshRequest.Token);
+            var username = tokenContent.Claims.ToList().FirstOrDefault(q => q.Type == JwtRegisteredClaimNames.Email)?.Value;
+
+            var user = await _userManager.FindByNameAsync(username);
+
+            if (user is null) return null;
+
+            var isValidRefreshToken = await _userManager.VerifyUserTokenAsync(user, _loginProvider, _refreshToken, refreshRequest.RefreshToken);
+
+            if (isValidRefreshToken)
+            {
+                return new SuccessfullAuthenticationDto
+                {
+                    Token = await GenerateJwtToken(user),
+                    RefreshToken = await CreateRefreshToken(user),
+                    UserId = user.Id,
+                };
+                
+            }
+            // invalid refresh token -> unauthorized
+            return null;
         }
     }
 }
